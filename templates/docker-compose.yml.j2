@@ -1,0 +1,49 @@
+services:
+  app:
+    image: {{ services.image }}
+    container_name: swiftdeploy_app
+    environment:
+      - MODE={{ services.mode }}
+      - APP_VERSION={{ services.version }}
+      - APP_PORT={{ services.port }}
+    networks:
+      - {{ network.name }}
+    volumes:
+      - {{ logging.volume }}:/var/log/app
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - "{{ services.port }}"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:{{ services.port }}/healthz')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 6
+
+  nginx:
+    image: {{ nginx.image }}
+    container_name: swiftdeploy_nginx
+    ports:
+      - "{{ nginx.port }}:{{ nginx.port }}"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ logging.volume }}:/var/log/nginx
+    networks:
+      - {{ network.name }}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+
+networks:
+  {{ network.name }}:
+    driver: {{ network.driver_type }}
+
+volumes:
+  {{ logging.volume }}:
