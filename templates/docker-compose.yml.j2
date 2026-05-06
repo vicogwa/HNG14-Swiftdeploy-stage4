@@ -41,6 +41,31 @@ services:
       app:
         condition: service_healthy
 
+  # OPA (Open Policy Agent) -- policy engine sidecar
+  # Reachable by the CLI on port 8181, but NOT exposed through nginx.
+  # Loads all .rego files from the policies/ directory at startup.
+  opa:
+    image: openpolicyagent/opa:latest-rootless
+    container_name: swiftdeploy_opa
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=error"
+      - "/policies"
+    volumes:
+      - ./policies:/policies:ro
+    ports:
+      - "8181:8181"
+    networks:
+      - {{ network.name }}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 networks:
   {{ network.name }}:
     driver: {{ network.driver_type }}
